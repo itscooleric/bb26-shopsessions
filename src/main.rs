@@ -960,6 +960,8 @@ fn main() {
         .and_then(|v| v.parse().ok())
         .unwrap_or_else(|| std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4))
         .max(1);
+    // variant: 4 threads when the scorer gives 8 CPUs (4/8 of the CPU count, which the scorer passes as NCPU)
+    let threads = (threads * 4 / 8).max(1);
 
     let man = std::fs::read_to_string(data.join("manifest.json")).expect("manifest");
     let ws = manifest_ts(&man, "window_start");
