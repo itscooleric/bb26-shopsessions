@@ -1459,6 +1459,7 @@ fn main() {
                     let mut catsum: Vec<i64> = vec![0; ncat];
                     let mut by_camp: Vec<(u16, i64)> = Vec::new();
                     let mut ptab: Vec<(Fp, u32)> = Vec::new();
+                    let mut pkeys: Vec<Fp> = Vec::new();
                     let mut rep: Vec<Sref> = Vec::new();
                     let (mut ecount, mut ccount, mut eoff, mut coff, mut epid, mut cpid): (Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>) =
                         (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
@@ -1474,10 +1475,12 @@ fn main() {
                             .collect();
                         let mut cg: Vec<_> = (0..threads).map(|tt| ck2[tt * SHARDS + sh].lock().unwrap()).collect();
                         let ne_: usize = eg.iter().map(|g| g.len()).sum();
-                        let cap = (ne_ * 2).next_power_of_two().max(64);
-                        let mask = cap - 1;
+                        // sized for people, not events (most people have several events); doubled when half full
+                        let mut cap = (ne_ / 2).next_power_of_two().max(64);
+                        let mut mask = cap - 1;
                         ptab.clear();
                         ptab.resize(cap, ((0, 0), u32::MAX));
+                        pkeys.clear();
                         ecount.clear();
                         epid.clear();
                         rep.clear();
@@ -1492,6 +1495,20 @@ fn main() {
                                         ptab[slot] = (e.ph, p);
                                         ecount.push(0);
                                         rep.push(e.person);
+                                        pkeys.push(e.ph);
+                                        if pkeys.len() * 2 > cap {
+                                            cap *= 2;
+                                            mask = cap - 1;
+                                            ptab.clear();
+                                            ptab.resize(cap, ((0, 0), u32::MAX));
+                                            for (q, &k) in pkeys.iter().enumerate() {
+                                                let mut sl = kh(k) as usize & mask;
+                                                while ptab[sl].1 != u32::MAX {
+                                                    sl = (sl + 1) & mask;
+                                                }
+                                                ptab[sl] = (k, q as u32);
+                                            }
+                                        }
                                         break p;
                                     }
                                     if k == e.ph {
