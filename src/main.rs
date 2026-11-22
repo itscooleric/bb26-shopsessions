@@ -1184,7 +1184,7 @@ fn main() {
     // then per shard mark ids seen once / twice
     let ev_units = chunks(&ev_files, 8 << 20);
     let ev_bytes: usize = ev_files.iter().map(|f| f.len()).sum();
-    let ncells = ((ev_bytes / 48).max(1 << 12) * 16).next_power_of_two().max(SHARDS * 64);
+    let ncells = ((ev_bytes / 48).max(1 << 12) * 8).next_power_of_two().max(SHARDS * 64);
     let cbits = (ncells / SHARDS).trailing_zeros();
     let eh_slots: Slots<u64> = new_slots(threads);
     let tid_next = AtomicUsize::new(0);
