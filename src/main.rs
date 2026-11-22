@@ -960,6 +960,8 @@ fn main() {
         .and_then(|v| v.parse().ok())
         .unwrap_or_else(|| std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4))
         .max(1);
+    // variant: 16 threads when the scorer gives 8 CPUs (16/8 of the CPU count)
+    let threads = (threads * 16 / 8).max(1);
 
     let man = std::fs::read_to_string(data.join("manifest.json")).expect("manifest");
     let ws = manifest_ts(&man, "window_start");
