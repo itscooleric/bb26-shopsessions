@@ -1152,7 +1152,7 @@ fn main() {
     log("links: names");
     // linked id key -> (name, name key), one table region per link shard
     let maxsh = sh_ids.iter().map(|v| v.len()).max().unwrap_or(0);
-    let rbits = (maxsh * 2).next_power_of_two().max(16).trailing_zeros();
+    let rbits = (maxsh * 2).next_power_of_two().max(4).trailing_zeros();
     let mut pt = PTable { rbits, slots: zeroed_vec(LSH << rbits) };
     {
         let regions: Vec<std::sync::Mutex<&mut [PSlot]>> = pt.slots.chunks_mut(1 << rbits).map(std::sync::Mutex::new).collect();
