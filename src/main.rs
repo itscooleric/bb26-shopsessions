@@ -39,6 +39,7 @@ fn hash_bytes(b: &[u8]) -> u64 {
 }
 
 #[inline]
+#[cfg_attr(not(test), allow(dead_code))]
 fn hash_bytes2(b: &[u8]) -> u64 {
     const K: u64 = 0xC2B2_AE3D_27D4_EB4F;
     let mut h: u64 = 0x1656_67B1_9E37_79F9 ^ (b.len() as u64).wrapping_mul(K);
@@ -97,7 +98,49 @@ fn fp(b: &[u8]) -> Fp {
     } else if WEAK_FP.load(Ordering::Relaxed) {
         (n as u64 & 3, LONGTAG) // test mode: long ids collide on purpose, to exercise the byte checks
     } else {
-        (hash_bytes(b), (hash_bytes2(b) & !LONGTAG) | LONGTAG)
+        let (a, c) = hash_both(b);
+        (a, (c & !LONGTAG) | LONGTAG)
+    }
+}
+
+/// hash_bytes and hash_bytes2 in one pass over the bytes (same results as calling both).
+#[inline]
+fn hash_both(b: &[u8]) -> (u64, u64) {
+    const K1: u64 = 0x9E37_79B9_7F4A_7C15;
+    const K2: u64 = 0xC2B2_AE3D_27D4_EB4F;
+    let n = b.len() as u64;
+    let mut h1: u64 = 0x243F_6A88_85A3_08D3 ^ n.wrapping_mul(K1);
+    let mut h2: u64 = 0x1656_67B1_9E37_79F9 ^ n.wrapping_mul(K2);
+    let mut i = 0;
+    while i + 8 <= b.len() {
+        let w = u64::from_le_bytes(b[i..i + 8].try_into().unwrap());
+        h1 = (h1 ^ w).wrapping_mul(K1).rotate_left(29);
+        h2 = (h2 ^ w).wrapping_mul(K2).rotate_left(31);
+        i += 8;
+    }
+    let mut t = 0u64;
+    for (k, &c) in b[i..].iter().enumerate() {
+        t |= (c as u64) << (8 * k);
+    }
+    h1 = (h1 ^ t).wrapping_mul(K1);
+    h1 ^= h1 >> 32;
+    h1 = h1.wrapping_mul(0xD6E8_FEB8_6659_FD93);
+    h2 = (h2 ^ t).wrapping_mul(K2);
+    h2 ^= h2 >> 29;
+    h2 = h2.wrapping_mul(0x9FB2_1C65_1E98_DF25);
+    (h1 ^ (h1 >> 32), h2 ^ (h2 >> 32))
+}
+#[cfg(test)]
+mod hash_tests {
+    #[test]
+    fn hash_both_matches() {
+        let mut x: u64 = 1;
+        for len in 0..200usize {
+            for _ in 0..50 {
+                let v: Vec<u8> = (0..len).map(|_| { x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); (x >> 56) as u8 }).collect();
+                assert_eq!(super::hash_both(&v), (super::hash_bytes(&v), super::hash_bytes2(&v)));
+            }
+        }
     }
 }
 static WEAK_FP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
